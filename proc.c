@@ -6,7 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
-
+#include "stddef.h"
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -88,7 +88,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->call_count = 0;
+  p->goodcall_count = 0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -226,6 +227,7 @@ fork(void)
 // until its parent calls wait() to find out it exited.
 void
 exit(void)
+// TODO: not sure if exit should be included in the number of calls
 {
   struct proc *curproc = myproc();
   struct proc *p;
@@ -296,13 +298,18 @@ wait(void)
         p->killed = 0;
         p->state = UNUSED;
         release(&ptable.lock);
+		
+	    
+		
         return pid;
+	
       }
     }
 
     // No point waiting if we don't have any children.
     if(!havekids || curproc->killed){
       release(&ptable.lock);
+
       return -1;
     }
 
@@ -351,6 +358,7 @@ scheduler(void)
       c->proc = 0;
     }
     release(&ptable.lock);
+
 
   }
 }
@@ -531,4 +539,38 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int
+getnumsyscalls(int pid)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      
+      release(&ptable.lock);
+      return p->call_count;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
+}
+
+int
+getnumsyscallsgood(int pid)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      
+      release(&ptable.lock);
+      return p->goodcall_count;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
 }

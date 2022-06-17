@@ -7,6 +7,7 @@
 #include "mmu.h"
 #include "proc.h"
 
+
 int
 sys_fork(void)
 {
@@ -22,24 +23,47 @@ sys_exit(void)
 
 int
 sys_wait(void)
-{
-  return wait();
+{ 
+  struct proc *curproc = myproc();
+  int return_val = wait();
+
+  if(return_val != -1){
+    (curproc->goodcall_count)++;	
+    }
+  (curproc->call_count)++;
+  return return_val;
 }
 
 int
 sys_kill(void)
 {
   int pid;
+  struct proc *curproc = myproc();
 
   if(argint(0, &pid) < 0)
     return -1;
-  return kill(pid);
+  int return_val = kill(pid);
+
+  if(return_val != -1){
+    (curproc->goodcall_count)++;	
+    }
+  (curproc->call_count)++;
+  return return_val;
+ 
 }
 
 int
 sys_getpid(void)
 {
-  return myproc()->pid;
+  int return_val = myproc()->pid;
+  struct proc *curproc = myproc();
+
+  if(return_val != -1){
+    (curproc->goodcall_count)++;	
+    }
+  (curproc->call_count)++;
+  return return_val;
+  
 }
 
 int
@@ -59,21 +83,34 @@ sys_sbrk(void)
 int
 sys_sleep(void)
 {
+  struct proc *curproc = myproc();
   int n;
   uint ticks0;
 
-  if(argint(0, &n) < 0)
+  if(argint(0, &n) < 0) {
+		
+    
+    (curproc->call_count)++;
+
     return -1;
+	}
   acquire(&tickslock);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
     if(myproc()->killed){
       release(&tickslock);
+     
+    
+    (curproc->call_count)++;
+
       return -1;
     }
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
+  (curproc->goodcall_count)++;	
+  (curproc->call_count)++;
+
   return 0;
 }
 
@@ -82,10 +119,44 @@ sys_sleep(void)
 int
 sys_uptime(void)
 {
+  struct proc *curproc = myproc();
+
   uint xticks;
 
   acquire(&tickslock);
   xticks = ticks;
   release(&tickslock);
-  return xticks;
+  int return_val = xticks;
+  
+  if(return_val != -1){
+    (curproc->goodcall_count)++;	
+    }
+  (curproc->call_count)++;
+  return return_val;
+
 }
+
+int
+sys_getnumsyscalls(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  return getnumsyscalls(pid);
+
+}
+
+int
+sys_getnumsyscallsgood(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  return getnumsyscallsgood(pid);
+
+}
+
+
+

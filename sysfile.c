@@ -55,62 +55,95 @@ fdalloc(struct file *f)
 int
 sys_dup(void)
 {
+  struct proc *curproc = myproc();
   struct file *f;
   int fd;
 
-  if(argfd(0, 0, &f) < 0)
+  if(argfd(0, 0, &f) < 0) {
+	(curproc->call_count)++;
     return -1;
-  if((fd=fdalloc(f)) < 0)
+	}
+  if((fd=fdalloc(f)) < 0) {
+	(curproc->call_count)++;
     return -1;
+	}
   filedup(f);
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
+
   return fd;
 }
 
 int
 sys_read(void)
 {
+  struct proc *curproc = myproc();
   struct file *f;
   int n;
   char *p;
 
-  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
+  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0) {
+	
+  (curproc->call_count)++;
+
     return -1;
+  }
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
+
   return fileread(f, p, n);
 }
 
 int
 sys_write(void)
 {
+  struct proc *curproc = myproc();
   struct file *f;
   int n;
   char *p;
 
-  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
+  if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0) {
+	(curproc->call_count)++;	
     return -1;
+  }
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
+
   return filewrite(f, p, n);
 }
 
 int
 sys_close(void)
 {
+  struct proc *curproc = myproc();
   int fd;
   struct file *f;
 
-  if(argfd(0, &fd, &f) < 0)
+  if(argfd(0, &fd, &f) < 0) {
+    (curproc->call_count)++;
     return -1;
+	}
   myproc()->ofile[fd] = 0;
   fileclose(f);
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
   return 0;
 }
 
 int
 sys_fstat(void)
 {
+  struct proc *curproc = myproc();
   struct file *f;
   struct stat *st;
 
-  if(argfd(0, 0, &f) < 0 || argptr(1, (void*)&st, sizeof(*st)) < 0)
+  if(argfd(0, 0, &f) < 0 || argptr(1, (void*)&st, sizeof(*st)) < 0) {
+	(curproc->call_count)++;
     return -1;
+  }
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
+
   return filestat(f, st);
 }
 
@@ -118,15 +151,18 @@ sys_fstat(void)
 int
 sys_link(void)
 {
+  struct proc *curproc = myproc();  
   char name[DIRSIZ], *new, *old;
   struct inode *dp, *ip;
 
-  if(argstr(0, &old) < 0 || argstr(1, &new) < 0)
+  if(argstr(0, &old) < 0 || argstr(1, &new) < 0) {
+	(curproc->call_count)++;
     return -1;
-
+  }
   begin_op();
   if((ip = namei(old)) == 0){
     end_op();
+	(curproc->call_count)++;
     return -1;
   }
 
@@ -134,6 +170,8 @@ sys_link(void)
   if(ip->type == T_DIR){
     iunlockput(ip);
     end_op();
+	(curproc->call_count)++;
+
     return -1;
   }
 
@@ -152,7 +190,8 @@ sys_link(void)
   iput(ip);
 
   end_op();
-
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
   return 0;
 
 bad:
@@ -161,6 +200,7 @@ bad:
   iupdate(ip);
   iunlockput(ip);
   end_op();
+  (curproc->call_count)++;
   return -1;
 }
 
@@ -184,17 +224,20 @@ isdirempty(struct inode *dp)
 int
 sys_unlink(void)
 {
+  struct proc *curproc = myproc();
   struct inode *ip, *dp;
   struct dirent de;
   char name[DIRSIZ], *path;
   uint off;
 
-  if(argstr(0, &path) < 0)
+  if(argstr(0, &path) < 0){
+	(curproc->call_count)++;
     return -1;
-
+  }
   begin_op();
   if((dp = nameiparent(path, name)) == 0){
     end_op();
+	(curproc->call_count)++;
     return -1;
   }
 
@@ -229,16 +272,20 @@ sys_unlink(void)
   iunlockput(ip);
 
   end_op();
-
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
+  
   return 0;
 
 bad:
   iunlockput(dp);
   end_op();
+  (curproc->call_count)++;
+
   return -1;
 }
 
-static struct inode*
+static struct inode* 
 create(char *path, short type, short major, short minor)
 {
   struct inode *ip, *dp;
@@ -285,31 +332,36 @@ create(char *path, short type, short major, short minor)
 int
 sys_open(void)
 {
+  struct proc *curproc = myproc(); 
   char *path;
   int fd, omode;
   struct file *f;
   struct inode *ip;
 
-  if(argstr(0, &path) < 0 || argint(1, &omode) < 0)
+  if(argstr(0, &path) < 0 || argint(1, &omode) < 0){
     return -1;
-
+	(curproc->call_count)++;
+    }
   begin_op();
 
   if(omode & O_CREATE){
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
       end_op();
+	  (curproc->call_count)++;
       return -1;
     }
   } else {
     if((ip = namei(path)) == 0){
       end_op();
+	  (curproc->call_count)++;
       return -1;
     }
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();
+	  (curproc->call_count)++;
       return -1;
     }
   }
@@ -319,6 +371,7 @@ sys_open(void)
       fileclose(f);
     iunlockput(ip);
     end_op();
+	(curproc->call_count)++;
     return -1;
   }
   iunlock(ip);
@@ -329,28 +382,37 @@ sys_open(void)
   f->off = 0;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
+
   return fd;
 }
 
 int
 sys_mkdir(void)
 {
+  struct proc *curproc = myproc();
   char *path;
   struct inode *ip;
 
   begin_op();
   if(argstr(0, &path) < 0 || (ip = create(path, T_DIR, 0, 0)) == 0){
     end_op();
+	(curproc->call_count)++;
     return -1;
   }
   iunlockput(ip);
   end_op();
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
+
   return 0;
 }
 
 int
 sys_mknod(void)
-{
+{ 
+  struct proc *curproc = myproc();
   struct inode *ip;
   char *path;
   int major, minor;
@@ -361,41 +423,51 @@ sys_mknod(void)
      argint(2, &minor) < 0 ||
      (ip = create(path, T_DEV, major, minor)) == 0){
     end_op();
+	(curproc->call_count)++;
     return -1;
   }
   iunlockput(ip);
   end_op();
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
+
   return 0;
 }
 
 int
 sys_chdir(void)
 {
+  struct proc *curproc = myproc();
   char *path;
   struct inode *ip;
-  struct proc *curproc = myproc();
   
   begin_op();
   if(argstr(0, &path) < 0 || (ip = namei(path)) == 0){
     end_op();
+	(curproc->call_count)++;
     return -1;
   }
   ilock(ip);
   if(ip->type != T_DIR){
     iunlockput(ip);
     end_op();
+	(curproc->call_count)++;
     return -1;
   }
   iunlock(ip);
   iput(curproc->cwd);
   end_op();
   curproc->cwd = ip;
+  (curproc->goodcall_count)++;
+  (curproc->call_count)++;
+
   return 0;
 }
 
 int
 sys_exec(void)
-{
+{ 
+  
   char *path, *argv[MAXARG];
   int i;
   uint uargv, uarg;
@@ -422,23 +494,32 @@ sys_exec(void)
 int
 sys_pipe(void)
 {
+  struct proc *curproc = myproc();
   int *fd;
   struct file *rf, *wf;
   int fd0, fd1;
 
-  if(argptr(0, (void*)&fd, 2*sizeof(fd[0])) < 0)
+  if(argptr(0, (void*)&fd, 2*sizeof(fd[0])) < 0){
+    (curproc->call_count)++;
     return -1;
-  if(pipealloc(&rf, &wf) < 0)
+	}
+  if(pipealloc(&rf, &wf) < 0) {
+    (curproc->call_count)++;
     return -1;
+	}
   fd0 = -1;
   if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){
     if(fd0 >= 0)
       myproc()->ofile[fd0] = 0;
     fileclose(rf);
-    fileclose(wf);
+    fileclose(wf);  
+    (curproc->call_count)++;
     return -1;
   }
   fd[0] = fd0;
   fd[1] = fd1;
+ (curproc->goodcall_count)++;
+ (curproc->call_count)++;
+ 
   return 0;
 }
